@@ -5,7 +5,6 @@ import scipy.stats as stats
 from scipy.sparse import dok_matrix
 from load import loader
 import time
-
 t = loader("20newsgroups.mat")
 word_list = []
 for word in t["words"]:
@@ -45,32 +44,36 @@ for iteration in range(num_iterations):
 				P_vec[k] = U[key[0],k]*V[key[1],k]
 			P_vec = P_vec / np.sum(P_vec)
 			X_out[key[0],key[1]] = np.random.multinomial(matrix[key[0],key[1]], P_vec).astype(np.float32)
-	a_i = np.sum(X_out, axis=1) + a_u
-	b_i = np.sum(V, axis=0, keepdims=True) + (b_u)
-	U_new = np.random.gamma(a_i, 1./b_i)
-	a_i = np.sum(X_out, axis=0) + a_v
-	b_i = np.sum(U_new, axis=0, keepdims=True) + b_v
-	V_new = np.random.gamma(a_i,1./b_i)
-	calc = np.matmul(U_new, np.transpose(V_new))
-	X_new = np.zeros_like(calc)
+	print()
+	a_i = np.sum(X_out, axis=0) + a_u
+	b_i = np.sum(V, axis=0, keep_dims=True) + (b_u)
+		U_new[i] = np.random.gamma(a_i, 1./b_i)
+	for j in range(M):
+		a_i = np.sum(X_out[:,j], axis=0) + np.ones([K])*a_v
+		b_i = np.sum(U_new, axis=0) + np.ones([K])*(b_v)
+		V_new[j] = np.random.gamma(a_i,1./b_i)
+	X_new = np.matmul(U_new, np.transpose(V_new))
 	error_train = 0.
 	error_test = 0.
-	for key in train_keys :
-		print("Doing for key : {:7d}".format(key[0]), end='\r')
-		X_new[key[0], key[1]] = np.random.poisson(calc[key[0], key[1]])
-		error_train += np.abs(X_new[key[0], key[1]] - matrix[key[0], key[1]])
-	for key in test_keys :
-		print("Doing for key : {:7d}".format(key[0]), end='\r')
-		X_new[key[0], key[1]] = np.random.poisson(calc[key[0], key[1]])
-		error_test += np.abs(X_new[key[0], key[1]] - matrix[key[0], key[1]])
-	error_train /= len(train_keys)
-	error_test /= len(test_keys)
-	if flag or iteration < 50 :
+	if flag or i < 50 :
 		flag = False
 		X_mc = np.copy(X_new)
 	else :
 		X_mc = ((float(i) / i+1)*X_mc + (1./i+1)*X_new)
 	count = 0
+	diff = np.abs(X_mc - matrix)
+	error_train = dok_matrix(matrix.shape)
+	error_test= dok_matrix(matrix.shape)
+	for key in train_keys :
+		error_train[key[0], key[1]] = diff[key[0], key[1]] 
+	for key in test_keys :
+		error_test[key[0], key[1]]= diff[key[0], key[1]]
+	print(error_train)
+	print(error_test)
+	error_train_val = np.mean(error_train)
+	error_test_val = np.mean(error_test)
 	U = np.copy(U_new)
 	V = np.copy(V_new)
-	print("Errors for iteration ({}) with test {} and train {} in time ({})".format(iteration+1,error_test, error_train, time.time() - start_iter))
+	print("Errors for iteration ({}) with test {} and train {} in time ({})".format(iteration+1,error_test_val, error_train_val, time.time() - start_iter))
+	print(X_new - matrix)
+	print(matrix)
